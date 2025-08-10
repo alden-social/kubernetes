@@ -23,14 +23,12 @@ EOF
     apt-get update
     apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
 
-    # containerd
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-      | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    apt-get update && apt-get install -y containerd.io
+    # containerd (Ubuntu repo)
+    apt-get install -y containerd
     mkdir -p /etc/containerd
     containerd config default | tee /etc/containerd/config.toml >/dev/null
     sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+    sed -i '/^disabled_plugins/d' /etc/containerd/config.toml || true
     systemctl enable --now containerd
 
     # Kubernetes
@@ -55,6 +53,8 @@ EOF
     node.vm.provision "shell", inline: <<-SHELL
       set -eux
       if [ ! -f /vagrant/.cp-initialized ]; then
+        kubeadm reset -f || true
+        kubeadm config images pull
         kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=192.168.56.10
         mkdir -p $HOME/.kube
         cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
